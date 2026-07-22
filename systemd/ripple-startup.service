@@ -1,0 +1,11 @@
+[Unit]
+Description=Emit Ripple startup event
+Requires=ripple.service
+After=ripple.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ripple emit startup
+
+[Install]
+WantedBy=multi-user.target

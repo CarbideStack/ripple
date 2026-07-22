@@ -1,0 +1,6 @@
+#!/bin/bash
+
+echo "Building ripple"
+go build -buildvcs=false -o ../ripple ./binary
+
+echo "Done"
