@@ -60,6 +60,11 @@ type ExecChannel struct {
 	 */
 	Args []string
 
+	/**
+	 *
+	 */
+	Timeout time.Duration
+
 	/*
 	 * Done receives the completion error from the dispatcher worker.
 	 */
@@ -104,6 +109,7 @@ func InitDispatcher() {
 			req.Done <- executeEvent(
 				req.EventType,
 				req.Args,
+				req.Timeout,
 			)
 
 			close(req.Done)
@@ -116,8 +122,7 @@ func InitDispatcher() {
  *
  * The request is queued for execution and processed in FIFO
  * order by the dispatcher worker. The caller blocks until the
- * event has completed execution or the dispatch operation
- * times out.
+ * event has completed synchronous execution.
  *
  * @param eventType
  *   Event identifier to dispatch.
@@ -125,30 +130,27 @@ func InitDispatcher() {
  * @param args
  *   Additional arguments passed to event handlers.
  *
+ * @param timeout
+ *   Maximum runtime per synchronous handler. Zero disables the timeout.
+ *
  * @return
- *   Any execution error returned by an event handler, or a
- *   timeout error if execution does not complete within the
- *   configured timeout period.
+ *   Any execution error returned by an event handler.
  */
 func DispatchEvent(
 	eventType string,
 	args []string,
+	timeout time.Duration,
 ) error {
 	done := make(chan error, 1)
 
 	dispatchQueue <- ExecChannel{
 		EventType: eventType,
 		Args:      args,
+		Timeout:   timeout,
 		Done:      done,
 	}
 
-	select {
-	case err := <-done:
-		return err
-
-	case <-time.After(20 * time.Second):
-		return fmt.Errorf("%w: while waiting on '%s' event dispatching", ErrTimeout, eventType)
-	}
+	return <-done
 }
 
 /**
@@ -193,9 +195,11 @@ func executeEventHandler(
 	)
 
 	var cmd *exec.Cmd
+	ctx := context.Background()
 
 	if timeout > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 
 		cmd = exec.CommandContext(
@@ -214,7 +218,10 @@ func executeEventHandler(
 	err := cmd.Run()
 
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("%w: handler %s exceeded its execution timeout", ErrTimeout, event.Name)
+
+		} else if exitErr, ok := err.(*exec.ExitError); ok {
 			return fmt.Errorf("%w: %s", ErrExitError, exitErr.Error())
 		}
 
@@ -246,6 +253,7 @@ func executeEventHandler(
 func executeEvent(
 	eventType string,
 	args []string,
+	timeout time.Duration,
 ) error {
 	handlers := ListHandlers(eventType)
 
@@ -296,7 +304,7 @@ func executeEvent(
 			handler,
 			args,
 			identifier,
-			5*time.Second,
+			timeout,
 		)
 
 		if err != nil {

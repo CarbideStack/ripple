@@ -32,6 +32,7 @@ import (
 	"ripple/triggers"
 	"ripple/utils"
 	"strconv"
+	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/spf13/pflag"
@@ -41,6 +42,11 @@ import (
  * REGISTRY_PATH is the default filesystem root for event handler discovery.
  */
 const REGISTRY_PATH = "/etc/ripple/handlers"
+
+/**
+ * DefaultTimeout is the default synchronous handler timeout. Zero disables it.
+ */
+var DefaultTimeout = 5 * time.Second
 
 /**
  * Options contains the command-line configuration used to select daemon or
@@ -56,6 +62,11 @@ type Options struct {
 	 * Wait requests that an emitted event complete before the client returns.
 	 */
 	Wait bool
+
+	/*
+	 * Timeout specifies the synchronous handler timeout. Zero disables it.
+	 */
+	Timeout time.Duration
 
 	/*
 	 * Daemon selects dispatch-daemon operation instead of client operation.
@@ -93,6 +104,7 @@ func DispatchWatcher() {
 		req.Reply <- events.DispatchEvent(
 			req.Timer,
 			nil,
+			DefaultTimeout,
 		)
 	}
 }
@@ -310,6 +322,13 @@ func ParseOptions() (*Options, error) {
 		"run the ripple dispatch daemon",
 	)
 
+	fs.DurationVar(
+		&opts.Timeout,
+		"timeout",
+		DefaultTimeout,
+		"timeout per synchronous event handler (0 disables timeout; --daemon or --emit only)",
+	)
+
 	fs.StringVar(
 		&opts.AllowedGID,
 		"gid",
@@ -339,6 +358,10 @@ func ParseOptions() (*Options, error) {
 		os.Exit(0)
 	}
 
+	if opts.Timeout < 0 {
+		return nil, fmt.Errorf("timeout must not be negative")
+	}
+
 	args := fs.Args()
 
 	if opts.Daemon {
@@ -348,6 +371,8 @@ func ParseOptions() (*Options, error) {
 		} else if opts.Wait {
 			return nil, fmt.Errorf("invalid use of --wait")
 		}
+
+		DefaultTimeout = opts.Timeout
 
 		return &opts, nil
 
@@ -383,6 +408,10 @@ func ParseOptions() (*Options, error) {
 
 	if opts.Wait && opts.Command != "emit" {
 		return nil, fmt.Errorf("invalid use of --wait")
+	}
+
+	if fs.Changed("timeout") && opts.Command != "emit" {
+		return nil, fmt.Errorf("invalid use of --timeout")
 	}
 
 	return &opts, nil

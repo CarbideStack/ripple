@@ -22,6 +22,8 @@
 
 package ipc
 
+import "time"
+
 /**
  * Request packet kinds.
  */
@@ -112,9 +114,10 @@ const (
  * EmitRequest is the payload used to request event dispatch from the daemon.
  */
 type EmitRequest struct {
-	Event string   `json:"event"`
-	Args  []string `json:"args,omitempty"`
-	Wait  bool     `json:"wait"`
+	Event   string        `json:"event"`
+	Args    []string      `json:"args,omitempty"`
+	Wait    bool          `json:"wait"`
+	Timeout time.Duration `json:"timeout"`
 }
 
 func (req *EmitRequest) Validate() bool {

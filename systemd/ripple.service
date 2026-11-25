@@ -4,7 +4,7 @@ After=local-fs.target
 
 [Service]
 Type=notify
-ExecStart=/usr/bin/ripple --daemon --gid ripple
+ExecStart=/usr/bin/ripple --daemon --gid ripple --timeout 15s
 ExecReload=/usr/bin/ripple reload
 RuntimeDirectory=ripple
 RuntimeDirectoryMode=0755

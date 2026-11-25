@@ -151,7 +151,7 @@ func handlePacket(
 		}
 
 		if req.Wait {
-			if err := events.DispatchEvent(req.Event, req.Args); err != nil {
+			if err := events.DispatchEvent(req.Event, req.Args, req.Timeout); err != nil {
 				kind := ipc.KIND_REPLY_ERROR
 
 				if errors.Is(err, events.ErrExitError) {
@@ -165,7 +165,7 @@ func handlePacket(
 			}
 
 		} else {
-			go events.DispatchEvent(req.Event, req.Args)
+			go events.DispatchEvent(req.Event, req.Args, req.Timeout)
 		}
 
 		return socket.NewPacket(ipc.KIND_REPLY_OK), nil

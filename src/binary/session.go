@@ -75,9 +75,10 @@ func ClientSession(
 	case "emit":
 		packet := socket.NewPacket(ipc.KIND_DISPATCH)
 		err := packet.AttachPayload(&ipc.EmitRequest{
-			Event: opts.Args[0],
-			Args:  opts.Args[1:],
-			Wait:  opts.Wait,
+			Event:   opts.Args[0],
+			Args:    opts.Args[1:],
+			Wait:    opts.Wait,
+			Timeout: opts.Timeout,
 		})
 
 		if err != nil {
@@ -97,7 +98,7 @@ func ClientSession(
 			return fmt.Errorf("%w: one or more scripts terminated with error", events.ErrExitError)
 
 		} else if packet.IsKind(ipc.KIND_REPLY_TIMEOUT) {
-			return fmt.Errorf("%w: gave up waiting on the request", events.ErrTimeout)
+			return fmt.Errorf("%w: one or more handlers exceeded their execution timeout", events.ErrTimeout)
 		}
 
 		return fmt.Errorf("failed to emit event")
